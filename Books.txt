@@ -1,0 +1,1652 @@
+BOOKS:
+------------
+Q1)
+SET  SERVEROUTPUT ON;
+CREATE  OR REPLACE PACKAGE  Lib_Pack
+IS
+PROCEDURE  Display_Title(city_name location.city%type);
+END Lib_Pack;
+/
+
+CREATE  OR REPLACE PACKAGE  BODY Lib_Pack
+IS
+PROCEDURE Display_Title(city_name location.city%type)
+IS
+city_count number;
+v_locid location.location_id%type;
+v_accno stock.accession_no%type;
+ existing_city exception;
+ cursor c1(loc_id location.location_id%type) is select s.accession_no,s.isbn,b.title
+ from stock s,books b where s.location_id = loc_id and s.isbn=b.isbn;
+BEGIN
+select count(*) into city_count from location where city=city_name;
+IF(city_count>0) then
+  select location_id into v_locid from location where city=city_name;
+   DBMS_OUTPUT.PUT_LINE('ACC_NO'||chr(9)||'ISBN '||' Title_name');
+ FOR rec in c1(v_locid)
+  loop
+  DBMS_OUTPUT.PUT_LINE(rec.accession_no||'  '||rec.isbn||'  '||rec.title);
+   END loop;
+ELSE
+ raise existing_city;
+END IF;
+
+EXCEPTION
+  when existing_city then 
+   DBMS_OUTPUT.PUT_LINE('City do not exist');
+END Display_Title;
+END Lib_Pack;
+ /
+
+--PIC
+
+Q2)
+SET SERVEROUTPUT ON
+CREATE OR REPLACE PROCEDURE ADD_BOOKS(V_ISBN BOOKS.ISBN%TYPE,V_AUTHOR BOOKS.AUTHOR%TYPE,
+V_TITLE BOOKS.TITLE%TYPE,V_PNAME BOOKS.PUBLISHER_NAME%TYPE,
+V_PDATE BOOKS.PUBLISH_DATE%TYPE,V_PRICE BOOKS.UNIT_PRICE%TYPE)
+IS 
+V_COUNT1 NUMBER;
+V_COUNT2 NUMBER;
+EXP1 EXCEPTION;
+EXP2 EXCEPTION;
+BEGIN
+SELECT COUNT (AUTHOR) INTO V_COUNT1 FROM BOOKS WHERE AUTHOR=V_AUTHOR;
+IF V_COUNT1>3 THEN
+RAISE EXP1;
+END IF;
+SELECT COUNT (ISBN) INTO V_COUNT2 FROM BOOKS WHERE ISBN=V_ISBN;
+IF V_COUNT2>0 THEN
+RAISE EXP2;
+END IF;
+INSERT INTO BOOKS VALUES (V_ISBN,V_AUTHOR,V_TITLE,V_PNAME,V_PDATE,V_PRICE);
+EXCEPTION
+WHEN EXP1 THEN
+   DBMS_OUTPUT.PUT_LINE ('MORE THAN 3 TITLES FOR 1 AUTHOR');
+WHEN EXP2 THEN
+ DBMS_OUTPUT.PUT_LINE ('ISBN IS NOT UNIQUE');
+ END ADD_BOOKS; 
+/
+
+--PIC
+
+Q3)
+a)
+CREATE OR REPLACE TYPE Book_Type as object(
+ISBN VARCHAR2(6),
+Title_Name VARCHAR2(20),
+Unit_Price NUMBER(6,2)
+);
+/
+
+--PIC
+
+b)
+CREATE OR REPLACE TYPE Nt_Book_Type IS TABLE OF Book_Type;
+/
+
+--PIC
+
+c)
+CREATE TABLE Location_Tab(
+Location_Id VARCHAR2(5),
+Location_Name VARCHAR2(10),
+Books Nt_Book_Type
+)NESTED TABLE Books STORE AS book_type_SERVER;
+/
+
+--PIC
+
+d)
+ INSERT INTO Location_Tab VALUES('12345','HYDERABAD',Nt_Book_Type(Book_Type('123456','Java',480));
+INSERT INTO Location_Tab VALUES('12346','CHENNAI',Nt_Book_Type(Book_Type('123457','SAP',920));
+
+--PIC
+
+e)
+CREATE Function find_cost24(p_lid Location_tab.location_id%type) return number is
+v_total_cost number;
+e_ex exception;
+BEGIN
+SELECT sum( Location_tab.unit_price)into v_total_cost from location_tab where p_lid=location_id;
+IF(sql%notfound)
+THEN Raise e_ex;
+ELSE
+dbms_output.put_line('the total cost of the book is'||v_total_cost);
+END IF;
+EXCEPTION
+WHEN e_ex THEN
+dbms_output.put_line('the given location id is invalid');
+RETURN v_total_cost;
+END find_cost24;
+/
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+EMPLOYEES:
+
+
+1)
+--creating a procedure
+
+CREATE OR REPLACE
+PROCEDURE Proc_Exam_Level
+  (
+    p_Exam_Level Exam_info.EXAM_LEVEL% TYPE)
+--declaring variables,cursor and exceptions
+IS
+
+  Invalid_Level_Exception EXCEPTION;
+  v_count                 NUMBER(2);
+  CURSOR c_exam
+  IS
+    SELECT * FROM exam_info WHERE exam_level=p_Exam_Level;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM exam_info WHERE exam_level= p_Exam_Level;
+  IF(v_count=0) THEN
+    RAISE Invalid_Level_Exception;
+  END IF;
+  dbms_output.put_line('Exam_id'||chr(9)||'Exam_Name'||chr(9)||'Exam_Type');
+  dbms_output.put_line('-------'||chr(9)||'---------'||chr(9)||'---------');
+  FOR c_loop IN c_exam
+  LOOP
+    dbms_output.put_line(c_loop.EXAM_ID||''||chr(9)||c_loop.EXAM_NAME||''||chr(9)||c_loop.EXAM_TYPE);
+  END LOOP;
+EXCEPTION
+WHEN Invalid_Level_Exception THEN
+  dbms_output.put_line('INVALID_LEVEL');
+END Proc_Exam_Level;
+
+
+
+
+-----------------------------------------------------OUTPUT---------------------------------------------
+
+--valid
+SQL> begin
+  2  Proc_Exam_Level('Level1');
+  3  end;
+  4  /
+Exam_id Exam_Name       Exam_Type
+------- ---------       ---------
+E001    UNIX Commands   classroom
+E003    MS-word ondesk
+E004    HTML    ondesk
+E005    Java    classroom
+E007    Oracle  classroom
+
+PL/SQL procedure successfully completed.
+
+
+
+
+
+--invalid
+SQL> begin proc_exam_level('level0');
+  2  end;
+  3  /
+INVALID_LEVEL
+
+
+---------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------
+
+
+2)
+--creating package header
+
+CREATE OR REPLACE
+PACKAGE pkgReport
+IS
+PROCEDURE InsertEmployeeExamDetail
+  (
+    p_Employee_id Employee_exam.EMPLOYEE_ID%TYPE,
+    p_Exam_id Employee_Exam.EXAM_ID%TYPE,
+    p_Exam_score Employee_Exam.EXAM_SCORE%TYPE,
+    p_Exam_date Employee_Exam.EXAM_DATE%TYPE);
+END pkgReport;
+
+
+
+
+--creating package body
+
+
+create or replace package BODY pkgReport 
+IS
+
+--CREATING PRIVATE FUNCTION
+
+FUNCTION Validate_Score(f_Exam_Score Employee_Exam.EXAM_SCORE%TYPE) return Boolean
+is
+Begin
+IF (f_EXAM_SCORE<=100 and f_EXAM_SCORE>=1) THEN
+return true;
+ELSE 
+RETURN FALSE;
+END IF;
+
+END Validate_Score;
+
+--CREATING PUBLIC PROCEDURE
+
+procedure InsertEmployeeExamDetail(p_Employee_id Employee_exam.EMPLOYEE_ID%TYPE,p_Exam_id Employee_Exam.EXAM_ID%TYPE,p_Exam_score Employee_Exam.EXAM_SCORE%TYPE, p_Exam_date Employee_Exam.EXAM_DATE%TYPE)
+is
+BEGIN
+if(Validate_Score(p_Exam_score)) then
+insert into Employee_Exam values(p_Employee_id,p_Exam_id,p_Exam_date,p_Exam_score);
+else
+DBMS_OUTPUT.PUT_LINE('INVALID EXAM SCORE');
+END IF;
+END InsertEmployeeExamDetail;
+END pkgReport;
+----------------------------------output---------------------------------
+
+--valid 
+
+
+SQL> BEGIN
+  2  pkgReport.InsertEmployeeExamDetail(35677,'E002',60,'24-APR-2014');
+  3  END;
+  4  /
+
+PL/SQL procedure successfully completed.
+
+SQL> select * from Employee_exam;
+
+EMPLOYEE_ID EXAM_I EXAM_DATE EXAM_SCORE
+----------- ------ --------- ----------
+      35677 E002   22-DEC-09         70
+      45622 E005   02-JAN-10         75
+      35677 E003   10-DEC-09         80
+      34577 E006   12-NOV-09         85
+      15662 E007   15-JAN-10         78
+      34577 E007   16-JAN-10         75
+      35677 E007   22-DEC-09         70
+      35677 E002   24-APR-14         80
+      35677 E002   24-APR-14         60
+
+9 rows selected.
+
+
+--invalid
+
+SQL> begin
+  2  pkgReport.InsertEmployeeExamDetail(35677,'E002',-0,'24-APR-2014');
+  3  end;
+  4  /
+INVALID EXAM sCORE
+
+PL/SQL procedure successfully completed.
+
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+
+3)
+--creating user defined type i.e ExamObject
+
+CREATE OR REPLACE Type examObject AS OBJECT
+(
+ exam_name VARCHAR2(20),
+ exam_type VARCHAR2(20),
+ exam_level VARCHAR2(20)
+);
+
+--creating a type of examobject
+create type Exam_List as table of examObject;
+
+
+--creating a table 
+create table Exam_Table(emp_id Number(6),Exam_details Exam_List)nested table Exam_details store as Exam_details_tab;
+
+---------------------------------------output-----------------------------------------------
+
+--------------inserting details in the table
+
+INSERT
+INTO Exam_Table VALUES
+  (
+    1,
+    Exam_List
+    (
+    examObject('java','classroom','level1'),
+    examObject('jee','classroom','level2')
+    )
+    );
+
+
+
+sql>1 row inserted.
+
+
+------------------inserting into existing emp id
+
+insert into table(select Exam_details from Exam_Table where emp_id=1) values(
+    examObject('RDBMS','classroom','level2'));
+
+
+output
+
+
+SQL> insert into table(select Exam_details from Exam_Table where emp_id=1) values(
+  2      examObject('RDBMS','classroom','level2'));
+
+1 row created.
+select a.exam_name from table(select Exam_details from Exam_Table where emp_id=1) a;
+
+
+
+SQL> select a.exam_name from table(select Exam_details from Exam_Table where emp_id=1) a;
+
+EXAM_NAME
+--------------------
+java
+jee
+RDBMS
+
+
+---------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+
+4)
+create or replace procedure delete_proc(p_proc_name varchar2)
+is
+sql_str varchar2(200);
+begin
+sql_str:='drop PROCEDURE '||upper(p_proc_name);
+execute immediate sql_str;
+DBMS_OUTPUT.PUT_Line('procedure dropped successfully');
+Exception
+WHEN otherS THEN
+RAISE_APPLICATION_ERROR(-20001,'procedure does not exists');
+end delete_proc;
+
+-------------------------------------output-----------------------------------------------
+
+--valid 
+
+--creating dummy procedure
+
+ CREATE OR REPLACE
+    PROCEDURE PROCEDURE1 AS
+    BEGIN
+      NULL;
+    END PROCEDURE1;
+    
+
+sql>Procedure created.
+
+
+
+ begin
+ delete_proc('procedure1');
+ end;
+sql>procedure dropped successfully
+
+PL/SQL procedure successfully completed.
+
+
+
+--INVALID
+
+SQL> begin
+  2  delete_proc('PROCEDURE2');
+  3  end;
+  4  /
+procedure does not exists.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+GOLF:
+---------
+1)
+CREATE OR REPLACE
+PROCEDURE ShowPLayerDetails
+  (p_tournament_code IN player_performance.tournament_code%type )
+
+
+
+IS
+ 
+    CURSOR c_player IS
+    SELECT player_details.player_id,
+      player_name,
+      title_won
+    FROM player_details,player_performance
+    WHERE player_details.player_id=player_performance.player_id
+    AND tournament_code=p_tournament_code;
+  
+  v_high_score NUMBER;
+  v_p_name player_details.player_name%type;
+  v_p_id player_details.player_id%type;
+  v_cnt NUMBER(2);
+
+
+BEGIN
+
+
+  SELECT COUNT(*)
+  INTO v_cnt
+  FROM player_performance
+  WHERE tournament_code=p_tournament_code;
+
+  IF v_cnt<>0 THEN
+
+    DBMS_output.PUT_line('Player_Id'||chr(9)||'Player_NAme'||chr(9)||'Title_Won');
+    DBMS_output.PUT_line('_______________________________________________________');
+    FOR c_disp IN c_player
+    LOOP
+      DBMS_output.PUT_line(c_disp.player_id ||chr(9)||c_disp.player_name||chr(9)||c_disp.title_won);
+    END LOOP;
+    
+
+    SELECT MAX(PLayer_score)
+    INTO v_high_score
+    FROM player_performance
+    WHERE tournament_code=p_tournament_code;
+    
+    SELECT player_id
+    INTO v_p_id
+    FROM player_performance
+    WHERE tournament_code=p_tournament_code
+    AND player_score     =v_high_score;
+    
+    SELECT player_name INTO v_p_name FROM player_details WHERE player_id=v_p_id;
+    
+    DBMS_output.PUT_line(chr(10)||chr(10)||'HIGHEST SCORER OF TOURNAMENT '|| p_tournament_code ||' IS '|| v_p_name);
+
+
+  ELSE
+	    DBMS_output.PUT_line('Inavlid Tournament Code..!!');
+
+
+  END IF;
+
+
+
+END;
+
+
+
+
+-- exec ShowPLayerDetails('T1'); --valid tournament no
+
+-- exec ShowPLayerDetails('T9'); -- INvalid tournament no
+
+------------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------
+
+2)
+--PACKAGE pack_player header
+
+
+
+CREATE OR REPLACE package Pack_Player
+
+IS
+
+	procedure Add_Player
+	(
+		p_player_id player_details.player_id%type,
+		p_player_name player_details.player_name%type,
+		p_location player_details.location%type,
+		p_club_code player_details.club_code%type,
+		p_hire_date player_details.hire_date%type
+	);
+
+END Pack_Player;
+
+-- package pack_player_body
+
+
+CREATE OR REPLACE PACKAGE body Pack_Player 
+
+IS
+	-- private FUNCTION TO VALIDATE LOCATION
+
+	function validateLoc (f_location player_details.location%type) 
+	return boolean
+		
+	IS
+	
+	BEGIN
+
+		if f_location IN('Mumbai','Noida','BAngalore','Chennai') then
+
+
+			RETURN TRUE;
+
+		else
+			
+			RETURN false;
+		END if;
+
+	END validateLoc;
+
+
+	
+
+	Procedure Add_Player
+	(
+		p_player_id player_details.player_id%type,
+		p_player_name player_details.player_name%type,
+		p_location player_details.location%type,
+		p_club_code player_details.club_code%type,
+		p_hire_date player_details.hire_date%type
+	)
+
+	
+
+	IS
+
+		
+	BEGIN
+
+		
+		if (validateLoc(p_location)) then	
+		
+			insert into player_details values(p_player_id,p_player_name,p_location,p_club_code,p_hire_date);
+		
+			dbms_output.put_line('1 Record Inserted Successfully');
+
+		
+		else
+
+			dbms_output.put_line('Invalid Location Name...!!');
+	
+		END if;
+	
+	END Add_Player;
+
+
+
+END Pack_Player;	
+
+
+
+
+
+-- exec Pack_Player.Add_Player(7,'Will Smith','Mumbai','C2','12-feb-12'); -- VAlid Insertion
+
+
+-- exec Pack_Player.Add_Player(7,'Will Smith','Hyderabad','C2','12-feb-12'); -- INVALID insertion
+
+-----------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------
+
+3)
+CREATE OR REPLACE PROCEDURE ADD_COLUMN
+(
+	p_table_name tab.tname%type,
+	p_column_name varchar2,
+	p_data_type varchar2
+
+)
+
+
+IS
+	
+
+v_cnt number(1);
+
+v_stmt varchar2(50);
+
+BEGIN
+
+
+	select count(*) into v_cnt from tab where tname=UPPER(p_table_name);
+
+	if v_cnt=0 then
+		
+		RAISE_APPLICATION_ERROR(-20001,'INVALID TABLE NAME..!! TABLE DOES NOT EXIST');
+
+
+	END IF;
+
+
+	select count(*) INTO v_cnt from user_tab_cols where table_name=UPPER(p_table_name) and column_name=UPPER(p_column_name);
+
+	if v_cnt<>0 then
+	
+		RAISE_APPLICATION_ERROR(-20009,'COLUMN NAME ALREADY EXISTS..!! CANNOT ADD A COLUMN WITH THE SAME NAME');
+
+	END IF;
+
+
+	v_stmt := 'ALTER TABLE '||p_table_name||' ADD '||p_column_name||' '||p_data_type;
+
+	EXECUTE IMMEDIATE v_stmt;
+
+	dbms_output.put_line('COLUMN '||P_column_name||' ADDED TO TABLE '|| p_table_name);
+
+
+END ADD_COLUMN;
+
+
+
+
+-- create a dummy table for checking
+
+-- create table dummy(eno number(2));
+
+	-- SUCCESSFUL : NEW COLUMN ADDED
+-- exec ADD_COLUMN('dummy','ename','varchar2(10)'); 
+	
+
+	--INVALID TABLE NAME
+--exec ADD_COLUMN('dumm','sal','number');
+
+
+	--INVALID INPUT : EXISTING COLUMN NAME
+
+--	exec ADD_COLUMN('dummy','ename','varchar2(10)');
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+4)
+
+--creating a UDT to hold player_id and score
+
+
+CREATE OR REPLACE TYPE player_score AS OBJECT
+(
+	player_id NUMBER(2),
+		
+	score NUMBER(2)
+);
+
+
+
+
+-- NESTED TABLE creating a table of player_score type
+
+
+
+CREATE OR REPLACE TYPE player_list IS TABLE OF player_score;
+
+
+
+
+-- CREATING THE TABLE 
+
+
+
+CREATE TABLE TournamentPlayerDetails
+(
+	Tournament_Code varchar2(5) primary key,
+	Players player_list
+)NESTED TABLE Players STORE AS player_list_Server;
+
+
+
+
+-- inserting records into the table
+
+
+INSERT INTO TournamentPlayerDetails 
+VALUES ('C1',player_list(
+				player_score(1,60),
+				player_score(2,80)) );
+
+
+
+INSERT INTO TournamentPlayerDetails 
+VALUES ('C2',player_list(
+				player_score(3,60),
+				player_score(4,80)) ); 
+
+
+
+-- PROCEDURE TO INSERT DETAILS
+
+
+
+CREATE OR REPLACE PROCEDURE insertDetails
+(
+	p_Tournament_code TournamentPlayerDetails.Tournament_Code%type,
+	p_PlayerId NUMBER,
+	p_score NUMBER
+)
+
+
+IS
+
+v_cnt NUMBER(1);
+
+BEGIN
+
+	
+	select count(*) INTO v_cnt from TournamentPlayerDetails where Tournament_code=p_Tournament_code;
+
+
+	if v_cnt=1 then
+
+		insert into table(select Players from TournamentPlayerDetails where Tournament_code=p_Tournament_code)
+		VALUES(p_PLayerId,p_score);
+		
+		dbms_output.put_line(sql%rowcount||' Record Inserted');
+	else
+		
+		dbms_output.put_line('Invalid Tournament Code ..!!Tournament Code does not exist');
+
+	end if;
+
+
+END insertDetails;
+	
+
+
+-- successful insertion
+	-- exec insertDetails('C1',1,75);
+
+
+-- invalid tournament code
+	-- exec insertDetails('C5',2,80);
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SCHOLARS
+
+1)
+DROP PROCEDURE display_details;
+CREATE OR REPLACE PROCEDURE display_details (p_auth_name scholars.pri_author_name%type)
+IS
+auth_name exception;
+cursor c_auth_rep(p_aut_name varchar2,p_aut_id varchar2)
+is
+SELECT paper_id,domain_name,date_of_publish,no_of_pages 	
+FROM publications p,research_domain r
+WHERE p.pri_author_id=p_aut_id AND p.domain_id=r.domain_id;
+v_cnt number;
+v_auth_id scholars.pri_author_id%type;
+v_country scholars.country%type;
+
+BEGIN
+SELECT COUNT(*) INTO v_cnt FROM scholars WHERE upper(pri_author_name)=upper(p_auth_name);
+	IF (v_cnt=0) THEN
+	RAISE auth_name;
+	ELSE
+	SELECT pri_author_id,country INTO v_auth_id,v_country FROM scholars WHERE upper(pri_author_name)=upper(p_auth_name);
+	dbms_output.put_line('Author Id:'||v_auth_id||chr(9)||'Author Name:'||p_auth_name||chr(9)||'Country:'||v_country);
+	dbms_output.put_line('  ');
+	dbms_output.put_line('Paper_Id'||chr(9)||'domain_name'||chr(9)||'date_of_publish'||chr(9)||'no_of_pages');
+	dbms_output.put_line('  ');
+	FOR i in c_auth_rep(p_auth_name,v_auth_id)
+	LOOP
+	dbms_output.put_line(i.paper_id||chr(9)||i.domain_name||chr(9)||i.date_of_publish||chr(9)||i.no_of_pages);
+	END LOOP;
+	END IF;
+EXCEPTION
+WHEN auth_name THEN
+dbms_output.put_line('AUTHOR NAME NOT FOUND');
+END display_details;
+
+--test cases
+	--valid author name
+	exec display_details('kiran');
+	--invalid author name
+	exec display_details('Girish');
+
+-----------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------
+
+2)
+
+DROP PACKAGE pkg_payment;
+CREATE OR REPLACE PACKAGE pkg_payment IS
+FUNCTION make_payment (p_paper_id payments.paper_id%type,p_ifsc payments.bank_ifsc%type,p_fee  payments.total_fee_paid%type,p_acno  payments.sender_ac_no%type)RETURN varchar2;
+end pkg_payment;
+
+CREATE OR REPLACE PACKAGE BODY pkg_payment IS
+FUNCTION 
+	make_payment (p_paper_id payments.paper_id%type,p_ifsc payments.bank_ifsc%type,p_fee  payments.total_fee_paid%type,p_acno  payments.sender_ac_no%type)RETURN varchar2
+	IS
+	v_vch number;
+	v_voucher number;
+	v_vch_id varchar2(5);
+	v_vald varchar(50);
+	v_stat varchar(10);
+	v_date date;
+	BEGIN
+		SELECT MAX(TO_NUMBER(SUBSTR(voucher_id,2))) INTO v_vch FROM payments;
+		v_voucher:=v_vch+1;
+		v_date:=sysdate;
+		SELECT 'V'||trim(to_char(v_voucher,'009')) INTO v_vch_id FROM dual;
+		SELECT upper(status) INTO v_stat FROM publications WHERE paper_id=p_paper_id;
+		IF (v_stat='PUBLISHED') THEN
+		INSERT INTO payments values (v_vch_id,p_paper_id,p_ifsc,
+		p_fee,p_acno,v_date);
+		v_vald:='SUCCESS';
+		ELSE
+		v_vald:='PAPER NOT YET PUBLISHED';
+		END IF;
+		RETURN v_vald;
+	EXCEPTION
+	WHEN no_data_found THEN
+	dbms_output.put_line('INVALID PAPER ID');
+	END make_payment;
+END pkg_payment;
+
+--test cases
+	--valid input
+	declare
+	v_val varchar(50);
+	begin
+	v_val:=pkg_payment.make_payment('P006','sbi00154',500,'ac00007');
+	dbms_output.put_line(v_val);
+	exception
+	when others then
+	dbms_output.put_line(' ');
+	end;	
+
+	--page not published
+	declare
+	v_val varchar(50);
+	begin
+	v_val:=pkg_payment.make_payment('P003','sbi00154',500,'ac00007');
+	dbms_output.put_line(v_val);
+	exception
+	when others then
+	dbms_output.put_line(' ');
+	end;	
+	
+	--INAVLID PAPER
+	declare
+	v_val varchar(50);
+	begin
+	v_val:=pkg_payment.make_payment('v003','sbi00154',500,'ac00007');
+	dbms_output.put_line(v_val);
+	exception
+	when others then
+	dbms_output.put_line(' ');
+	end;	
+	
+--------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------
+
+3)
+drop type pay_details;
+CREATE OR REPLACE TYPE pay_details as object(
+v_voucher_id varchar2(5),
+v_dop date,
+amount number);
+-----------------------------------------------------
+drop table payment_info;
+create table payment_info(
+paper_id varchar2 (10),
+account_no number(15),
+IFSC_code varchar(10),
+payment_details pay_details);
+------------------------------------------------------------
+insert into payment_info values ('p009',12345578,'ktk0006',payment_details('v011',to_date(sysdate,'dd-mm-yyyy'),600);
+insert into payment_info values ('p014',12215578,'ktk0003',pay_details('v012',to_date(sysdate,'dd-mm-yyyy'),500);
+---------------------------------------------------------------------------------------------------------------------------------------
+create or replace procedure displaypaydetails(p_paper_id payments.paper_id%type)
+is
+v_amt number;
+begin
+SELECT sum(total_fee_paid) into v_amt FROM payments WHERE paper_id=p_paper_id;
+dbms_output.put_line('amount recieved is :'||v_amt);
+EXCEPTION
+	WHEN no_data_found THEN
+	dbms_output.put_line('INVALID PAPER ID');
+	END make_payment;
+end;
+
+
+-- test cases
+	exec displaypaydetails('P006');
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+STUDENT COURSE:
+
+1)
+create or replace package pkgstuddet
+is
+	procedure studdetails
+	(
+		p_grade studentcourse.grade%type
+	);
+end pkgstuddet;
+
+create or replace package body pkgstuddet
+is
+	procedure studdetails
+	(
+		p_grade studentcourse.grade%type
+	)
+	is
+		a exception;
+		v_grade studentcourse.grade%type;
+		cursor c_details is
+		select c.coursename, c.coursecategory, c.duration, s.studname, sc.grade from course c, student s, studentcourse sc
+		where sc.grade=p_grade and sc.coursecode=c.coursecode and sc.studcode=s.studcode;
+	begin
+		select count(grade) into v_grade from studentcourse where grade=p_grade;
+		if v_grade=0 then
+		raise a;
+		end if;
+		dbms_output.put_line('Sr.No.'||chr(9)||'C-Name'||chr(9)||'C-Category'||chr(9)||'Duration'||chr(9)||'S-Name'||chr(9)||'Grade');
+		dbms_output.put_line('==================================================================================');
+		for i in c_details 
+		loop
+		dbms_output.put_line(c_details%rowcount||chr(9)||i.coursename||chr(9)||i.coursecategory||chr(9)||i.duration||chr(9)||
+		i.studname||chr(9)||i.grade);
+		end loop;		
+	exception
+		when a then
+		dbms_output.put_line('Check grade');
+	end studdetails;
+end pkgstuddet;
+
+declare
+	v_show studentcourse.grade%type;
+begin
+	v_show:='&show';
+	pkgstuddet.studdetails(v_show);
+exception
+	WHEN OTHERS THEN
+	DBMS_OUTPUT.PUT_LINE(sqlerrm);
+end;
+
+begin
+	pkgstuddet.studdetails('A+');
+exception
+	WHEN OTHERS THEN
+	DBMS_OUTPUT.PUT_LINE(sqlerrm);
+end;
+_____________________________________________________________________________________________________________________________________________________
+2)
+create or replace function studcnt
+(
+	f_id studentcourse.coursecode%type,
+	f_grade studentcourse.grade%type
+)
+return number
+is 
+	v_cnt number;
+begin
+	SELECT COUNT(studcode) INTO v_cnt FROM studentcourse WHERE grade=f_grade AND coursecode=f_id;
+	return v_cnt;
+end studcnt;
+
+declare
+	v_id studentcourse.coursecode%type;
+	v_grade studentcourse.grade%type;
+	v_cnt number;
+	v_fees number;
+	exp exception;
+begin
+	v_id:=&id;
+	v_grade:='&grade';
+	v_cnt:=studcnt(v_id,v_grade);
+	if v_cnt<1 then
+	raise exp;
+	end if;
+	select fees into v_fees from course where coursecode=v_id;
+	dbms_output.put_line('Course code : '||v_id);
+	dbms_output.put_line('Fees : '||v_fees);
+	dbms_output.put_line('Number of students :'||v_cnt);
+	dbms_output.put_line('Grade : '||v_grade);
+exception
+	when exp then
+	dbms_output.put_line('No data');
+end;
+_____________________________________________________________________________________________________________________________________________________
+3)
+create or replace type passgrobj
+as object
+(
+	pass_id number(3),
+	pass_name varchar2(25),
+	city varchar2(25)
+);
+
+create or replace type pass_type as varray(3) of passgrobj;
+
+create table pass_info
+(
+	flight_id number(4) primary key,
+	source varchar2(25),
+	dest  varchar2(25),
+	pass_details pass_type
+);
+
+insert into pass_info values(1001,'Bangalore','Chennai', pass_type(
+							passgrobj(101, 'Samrudhi', 'Bangalore'),
+							passgrobj(105, 'Samrudhi', 'Delhi')));
+
+insert into pass_info values(1005,'Delhi,'Chennai', pass_type(
+							passgrobj(106, 'Saranya', 'Bangalore'),
+							passgrobj(104, 'Saranya', 'Pune')));
+
+insert into pass_info values(1009,'Bangalore','Pondicherry', pass_type(
+							passgrobj(102, 'Sindhu', 'Bangalore'),
+							passgrobj(100, 'Sindhu', 'Assam')));
+
+____________________________________________________________________________________________________________________________________________________
+							
+		------------------------------------------------------------------------------------------------------------------------------------------------------------------
+STUDENT REPORT:
+
+1)
+
+--FUNCTION STARTS
+
+CREATE OR REPLACE FUNCTION DeleteStudCourse 
+(
+	f_coursecode studentcourse.coursecode%TYPE,
+	f_studcode studentcourse.studcode%TYPE
+)
+RETURN BOOLEAN
+IS
+	invalidCourse EXCEPTION; 
+	v_stmt VARCHAR2(250);
+	v_count NUMBER;
+BEGIN
+	SELECT COUNT(*) INTO v_count FROM studentcourse WHERE coursecode=f_coursecode;
+	IF v_count>=1 THEN
+		v_stmt:='DELETE FROM STUDENTCOURSE 
+			WHERE COURSECODE = '||f_coursecode||' AND STUDCODE = '||f_studcode;
+		EXECUTE IMMEDIATE v_stmt;
+		RETURN TRUE;
+	ELSE
+		RAISE invalidCourse;	
+	END IF;
+EXCEPTION
+	WHEN invalidCourse THEN
+	DBMS_OUTPUT.PUT_LINE('INVALID COURSECODE');
+	RETURN FALSE;
+	WHEN OTHERS THEN
+	RETURN FALSE;
+END DeleteStudCourse;		--FUNCTION ENDS
+
+--ANONYMOUS BLOCK CALLING THE ABOVE FUNCTION - SUCCESSFULL EXCECUTION OF CODE
+
+BEGIN
+
+	IF DeleteStudCourse(1001,1000) THEN
+		DBMS_OUTPUT.PUT_LINE('DELETE SUCCESSFULL');
+	ELSE
+		DBMS_OUTPUT.PUT_LINE('DELETE FAILED');
+	END IF;
+EXCEPTION
+	WHEN OTHERS THEN
+	DBMS_OUTPUT.PUT_LINE(SQLERRM);
+END;
+
+
+--ANONYMOUS BLOCK CALLING THE ABOVE FUNCTION - FAILED EXCECUTION OF CODE
+BEGIN
+
+	IF DeleteStudCourse(3000,3000) THEN
+		DBMS_OUTPUT.PUT_LINE('DELETE SUCCESSFULL');
+	ELSE
+		DBMS_OUTPUT.PUT_LINE('DELETE FAILED');
+	END IF;
+EXCEPTION
+	WHEN OTHERS THEN
+	DBMS_OUTPUT.PUT_LINE(SQLERRM);
+END;
+--ANONYMOUS BLOCK ENDS HERE
+
+--END OF CODE
+
+-----------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+
+2)
+
+-- PROCEDURE STARTS FROM HERE
+
+CREATE OR REPLACE
+PROCEDURE Generate_grade
+(
+	p_coursecode studentcourse.coursecode%TYPE,
+	p_grade studentcourse.grade%TYPE
+)
+IS
+	CURSOR c_stud_data
+	IS SELECT studentcourse.studcode,student.studname FROM studentcourse,student
+	where student.studcode=studentcourse.studcode AND 
+	studentcourse.coursecode=p_coursecode AND 
+	studentcourse.grade=p_grade;
+	v_count NUMBER;
+BEGIN
+	SELECT  coursecode INTO v_count FROM studentcourse 
+	WHERE coursecode=p_coursecode AND grade=p_grade;
+	DBMS_OUTPUT.PUT_LINE('Following student scored the'||CHR(9)||p_grade
+	||CHR(9)||'grade in the course'||CHR(9)||p_coursecode);
+	DBMS_OUTPUT.PUT_LINE('Student Code'||CHR(9)||'Student Name');
+	FOR c_loop IN c_stud_data
+	LOOP
+		DBMS_OUTPUT.PUT_LINE(c_loop.studcode||CHR(9)||c_loop.studname);
+	END LOOP;
+EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+		DBMS_OUTPUT.PUT_LINE('Invalid coursecode/grade');
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END Generate_grade;
+
+-- PROCEDURE ENDS HERE 
+
+-- USING EXEC TO CALL THE ABOVE STORED PROCEDURE
+
+-- Successful execution
+exec Generate_grade(1001,'A+'); 
+
+-- raising no data found exception for invalid coursecode
+exec Generate_grade(1003,'A');  
+
+-- raising no data found exception for invalid grade
+exec Generate_grade(1003,'F');  
+ 
+---------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------
+
+3)
+
+-- Package specification starts from here
+
+CREATE OR REPLACE
+PACKAGE pkgCourse
+AS
+	PROCEDURE PrExamReport
+	(
+		p_coursecode course.coursecode%TYPE
+	);
+	FUNCTION fnCourseExam
+	(
+		f_coursecode course.coursecode%TYPE
+	)
+  RETURN VARCHAR2;
+END pkgCourse;
+
+-- End of Package specification
+
+-- Package body starts from here 
+
+CREATE OR REPLACE
+PACKAGE BODY pkgCourse
+AS
+	PROCEDURE PrExamReport
+	(
+		p_coursecode course.coursecode%TYPE
+	)
+	IS
+	v_count NUMBER;
+	BEGIN
+		SELECT count(*) into v_count
+		FROM student,studentcourse
+		WHERE student.studcode = studentcourse.studcode
+		AND student.studgender = 'F'
+		AND studentcourse.coursecode = p_coursecode;
+		DBMS_OUTPUT.PUT_LINE('Number of female student entered the course'
+		||CHR(9)||p_coursecode||CHR(9)||'is'||CHR(9)||v_count);
+	EXCEPTION
+		WHEN OTHERS THEN
+			DBMS_OUTPUT.PUT_LINE(sqlerrm);
+	END PrExamReport;
+
+	FUNCTION fnCourseExam
+	(
+		f_coursecode course.coursecode%TYPE
+	)
+	RETURN  VARCHAR2
+	IS
+		v_coursecategory course.coursecategory%TYPE;
+		v_count NUMBER;
+	BEGIN
+		SELECT COUNT(*) into v_count
+		FROM course
+		WHERE hasexam IN ('y','Y')
+		AND coursecode =f_coursecode;
+		IF v_count>=1 THEN
+			SELECT coursecategory into v_coursecategory
+			FROM course
+			WHERE hasexam IN ('y','Y')
+			AND coursecode =f_coursecode;
+			RETURN v_coursecategory;
+		ELSE
+			RETURN 'NoExam';
+		END IF;	
+	EXCEPTION
+		WHEN OTHERS THEN
+			DBMS_OUTPUT.PUT_LINE(sqlerrm);
+	END fnCourseExam;
+END pkgCourse;
+
+-- Package body ends here
+
+-- procedure to call no of females
+
+DECLARE
+	v_retrieve varchar2(10);
+BEGIN
+	pkgCourse.PrExamReport(1001);
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END;
+
+--anonymous block which prints the course category
+
+DECLARE
+	v_retrieve varchar2(10);
+BEGIN
+	pkgCourse.PrExamReport(1001);
+	DBMS_OUTPUT.PUT_LINE('Course Category');
+	DBMS_OUTPUT.PUT_LINE('-------------');
+	DBMS_OUTPUT.PUT_LINE(v_retrieve);
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END;
+
+-- anonymous block which prints the output NoExam
+
+DECLARE
+	v_retrieve varchar2(10);
+BEGIN
+	v_retrieve:=pkgCourse.fnCourseExam(1002);
+	DBMS_OUTPUT.PUT_LINE('Course Category');
+	DBMS_OUTPUT.PUT_LINE('-------------');
+	DBMS_OUTPUT.PUT_LINE(v_retrieve);
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END;
+
+
+------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+
+4)
+
+-- Creating the type examObject 
+
+CREATE OR REPLACE TYPE examObject AS OBJECT
+(
+	Exam_Name VARCHAR2(20),
+	Exam_Type VARCHAR2(10),
+	Exam_Level VARCHAR2(10)
+);
+
+-- Creating a table with the examObject type
+
+CREATE TABLE new_Exam_Info
+(
+	Exam_id number(5),
+	Exam_Details examObject
+);
+
+-- Procedure to insert one value
+
+CREATE OR REPLACE PROCEDURE InsertExamDetails
+(
+	p_eid new_Exam_Info.Exam_id%TYPE,
+	p_ename new_Exam_Info.Exam_Details.Exam_Name%TYPE,
+	p_etype new_Exam_Info.Exam_Details.Exam_Type%TYPE,
+	p_elvl new_Exam_Info.Exam_Details.Exam_Level%TYPE
+)
+IS
+  v_eid new_Exam_Info.Exam_id%TYPE;
+BEGIN
+	select Exam_id INTO v_eid from new_Exam_Info where Exam_id=p_eid;
+INSERT INTO new_Exam_Info VALUES
+(
+	p_eid,
+	examObject
+	(
+		p_ename,
+		p_etype,
+		p_elvl
+	)
+);
+DBMS_OUTPUT.PUT_LINE('1 ROW INSERTED');
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE(sqlerrm);
+END InsertExamDetails;
+
+--passing value to the procedure
+
+exec InsertExamDetails(1002,'OSS/BSS','OBJ','LVLI');
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+STUDENT:
+1)	
+CREATE OR REPLACE PACKAGE PkgStudDet IS
+PROCEDURE StudDetails(gr STUDENTCOURSE.GRADE%type);
+END PkgStudDet;
+
+--PIC
+
+CREATE OR REPLACE PACKAGE BODY PkgStudDet is
+    PROCEDURE StudDetails(gr STUDENTCOURSE.GRADE%TYPE) IS
+    v_course_code NUMBER(5);
+    i NUMBER;
+    v_stud_code NUMBER(5);
+   TYPE myrec1 IS RECORD(co_name VARCHAR2(30),co_category 
+     VARCHAR2(2),co_duration NUMBER);
+   var1 myrec1;
+   TYPE myrec2 IS RECORD(stud_name VARCHAR2(20));
+   var2 myrec2;
+   CURSOR mydata IS SELECT coursecode,studcode FROM studentcourse WHERE   
+   grade=gr;
+   BEGIN
+  	 i:=1;
+  	 dbms_output.put_line('sr  '||'courseName   '||'coursecategory  '|| 'Duration  '||
+     	 'Studentname '|| 'grade ');
+  	OPEN mydata;
+  LOOP
+  FETCH mydata INTO v_course_code,v_stud_code;
+ 		 EXIT WHEN mydata%notfound;
+SELECT coursename,coursecategory,duration INTO var1 FROM course WHERE coursecode=v_course_code;
+SELECT studname INTO var2 FROM student WHERE studcode=v_stud_code;
+dbms_output.put_line(i || var1.co_name||var1.co_category||var1.co_duration||var2.stud_name||gr);
+i:=i+1;
+END LOOP;
+CLOSE mydata;
+END StudDetails;
+END pkgStudDet;
+
+--PIC
+
+EXEC PkgStudDet.StudDetails('A');
+
+--PIC
+
+
+2)	
+A. CREATE OR REPLACE FUNCTION 
+  StudentCnt(CID in NUMBER , GRADEE VARCHAR2 ) 
+  RETURN NUMBER IS
+  COUNTT NUMBER;
+  BEGIN
+    SELECT COUNT(*) INTO COUNTT 
+  FROM Student s, Studentcourse sc, course c
+ WHERE (s.studcode=sc.studcode) AND (sc.grade=GRADEE AND c.coursecode=CID);
+  dbms_output.put_line('Course Code: '||CID);
+ dbms_output.put_line('Grade: '||GRADEE);
+  RETURN COUNTT;
+      EXCEPTION
+ WHEN OTHERS THEN
+ dbms_output.put_line('Exception Handled');
+  END StudentCnt;
+
+--PIC
+
+B.DECLARE
+  CID NUMBER:=&CID;
+  GD VARCHAR2(4):='&GD';
+  CNT NUMBER;
+  FEEE NUMBER;
+  BEGIN
+  SELECT FEES into FEEE FROM COURSE WHERE COURSECODE=CID;
+  CNT:=StudentCnt(CID,GD);
+  dbms_output.put_line('Fee For the Course: '||FEEE);
+  dbms_output.put_line('Total No of Students Opted For the Course: '||CNT);
+  END;
+
+--PIC
+
+3)
+A. CREATE TYPE passgrObject AS OBJECT(Passgr_id  NUMBER,Passgr_name VARCHAR2,City VARCHAR2);
+
+--PIC
+
+B. CREATE OR  REPLACE TYPE pass_type AS TABLE  of passgrObject;
+
+--PIC
+
+C. CREATE TABLE passgr_info
+    (Flight_id NUMBER PRIMARY KEY,
+    Source1 VARCHAR2(25),
+    Destination VARCHAR2(25),
+    Passenger_Detail pass_type)
+    NESTED TABLE passenger_detail STORE AS passgr_tab;
+
+--PIC
+
+D. INSERT INTO passgr_info VALUES (1844,'BANGALORE','SECUNDERABAD',PASS_TYPE(passgrObject(16,'Rishav','DELHI’),passgrObject(22,'Amitabh','JSR')));
+INSERT INTO passgr_info VALUES (1253,'DELHI','MANGLORE',PASS_TYPE(passgrObject(25,'ANKIT','INDORE'),passgrObject(35,'KUNAL','AMRITSAR')));
+INSERT INTO passgr_info VALUES (1263,'HOWRAH','MUMBAI',PASS_TYPE(passgrObject(28,'VIRENDRA','JAMSHEDPUR'),passgrObject(36,'KAVYA','HOWRAH')));
+
+--PIC
+
+E. SELECT a.passgr_id,a.passgr_name,a.city FROM  (SELECT passenger_detail FROM    passgr_info WHERE flight_id=1234)a;
+
+--PIC
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+VEHICLE
+
+1)
+CREATION OF PROCEDURE
+
+CREATE OR REPLACE PROCEDURE new_booking(p_id booking.vehicle_id%TYPE,p_cust booking.cust_id%TYPE,
+			p_training booking.training_date_time%TYPE,p_duration booking.duration%TYPE)
+IS
+	v_count number;
+	v_count1 number;
+	v_count2 number;	
+	v_bid number;
+	v_exception EXCEPTION;
+	v_exception1 EXCEPTION;
+	v_exception2 EXCEPTION;
+	v_exception3 EXCEPTION;
+	v_exception4 EXCEPTION;
+BEGIN
+	SELECT max(booking_id) INTO v_count FROM booking;
+	v_bid:=v_count+1;
+	
+	SELECT count(*) INTO v_count1 FROM customer WHERE cust_id=p_cust;
+	IF v_count1=0 then
+	RAISE v_exception;
+	END IF;
+
+	SELECT count(*) INTO v_count2 FROM vehicle WHERE vehicle_id=p_id;
+	IF v_count2=0 then
+	RAISE v_exception1;
+	END IF;  
+		
+	IF p_training>sysdate THEN
+	raise v_exception2;
+	END IF;
+
+	IF TO_CHAR(p_training,'hh24')<6 AND TO_CHAR(p_training,'hh24')>21 THEN
+	RAISE  v_exception3;
+	END IF;
+
+	IF p_duration<1 OR p_duration>2 THEN
+	RAISE v_exception4;
+	END IF;
+
+	INSERT INTO BOOKING VALUES(v_bid,p_id,p_cust,p_training,p_duration);
+	DBMS_OUTPUT.PUT_LINE('1 row inserted');
+
+EXCEPTION
+	WHEN v_exception THEN
+	DBMS_OUTPUT.PUT_LINE('CUSTOMER ID DOES NOT EXIST');
+
+	WHEN v_exception1 THEN
+	DBMS_OUTPUT.PUT_LINE('VEHICLE ID DOES NOT EXIST');
+
+	WHEN v_exception2 THEN
+	DBMS_OUTPUT.PUT_LINE('DATE GREATER THAN CURRENT DATE');
+	
+	WHEN v_exception3 THEN
+	DBMS_OUTPUT.PUT_LINE('INVALID TIME');
+
+	WHEN v_exception4 THEN
+	DBMS_OUTPUT.PUT_LINE('INVALID DURATION');
+
+END;
+/
+
+
+2. TEST CASE:
+
+	* correct input
+	 exec new_booking(5,101,to_date('16-may-2010-10','dd-mon-yyyy-hh24'),2);
+
+	* invalid custid
+	 exec new_booking(5,105,to_date('16-may-2010-12','dd-mon-yyyy-hh24'),2);
+		
+	*invalid vehicle id
+	 exec new_booking(100,101,to_date('16-may-2010-12','dd-mon-yyyy-hh24'),2);
+
+	*invalid date
+	 exec new_booking(5,101,to_date('16-may-2022-23','dd-mon-yyyy-hh24'),2);
+
+	*invalid duration
+	 exec new_booking(5,101,to_date('10-jun-2015-10','dd-mon-yyyy-hh24'),101);	
+
+	*valid duration
+	 exec new_booking(5,101,to_date('10-jun-2015-10','dd-mon-yyyy-hh24'),1);
+
+------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------
+
+2)
+1.CREATION OF PACKAGE HEADER
+
+CREATE OR REPLACE PACKAGE cust_booking 
+AS
+PROCEDURE call_get_count(p_cust_id IN customer.cust_id%TYPE);
+END;
+/
+
+2. CREATION OF PACKAGE BODY
+
+CREATE OR REPLACE PACKAGE BODY cust_booking 
+AS
+PROCEDURE call_get_count(p_cust_id IN customer.cust_id%TYPE)
+IS
+CURSOR cur_emp IS
+SELECT booking_id,vehicle_id,training_date_time,duration FROM booking WHERE cust_id=p_cust_id;
+v_count NUMBER;
+v_count1 NUMBER;
+cust_exp exception;
+BEGIN
+SELECT COUNT(*) INTO v_count from customer where cust_id=p_cust_id;
+IF v_count>0 THEN
+FOR i in cur_emp 
+LOOP
+DBMS_OUTPUT.PUT_LINE(i.booking_id||chr(9)||i.vehicle_id||chr(9)||i.training_date_time||chr(9)||i.duration);
+END LOOP;
+SELECT COUNT(*) INTO v_count1 from booking GROUP BY cust_id HAVING cust_id=p_cust_id;
+DBMS_OUTPUT.PUT_LINE('the count is'||chr(10)||v_count1);
+ELSE
+RAISE cust_exp;
+END IF;
+EXCEPTION
+WHEN cust_exp THEN
+DBMS_OUTPUT.PUT_LINE('customer id does not exist');
+WHEN NO_DATA_FOUND THEN
+DBMS_OUTPUT.PUT_LINE('customer did not book anything');
+END call_get_count;
+END cust_booking; 
+/
+
+3.TEST CASE:
+
+	* exec cust_booking.call_get_count(100);		--valid
+
+	* exec cust_booking.call_get_count(1);		--invalid
+
+	* exec cust_booking.call_get_count(104);		--valid with no data found exception which shows "customer didnot book anything" message.
+
+-------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+
+3)
+1. CREATING TYPE 
+
+CREATE OR REPLACE TYPE Booking_Type AS OBJECT 
+(
+	Booking_id NUMBER,
+	Training_Date DATE,
+	Duration NUMBER
+);
+/
+
+
+2. CREATING VARRAY
+
+CREATE OR REPLACE TYPE Booking_List_Type IS VARRAY(10) OF Booking_Type;
+
+
+
+3.CREATING TABLE
+
+CREATE TABLE Cust_Booking2
+(
+	Cust_id NUMBER(4) PRIMARY KEY,
+	Name VARCHAR2(20),
+	Booking_List Booking_List_Type
+);
+
+
+4. INSERTING VALUES
+
+INSERT INTO Cust_Booking2 VALUES(10,'PRABHU',Booking_List_Type(
+							Booking_Type(101,'12-DEC-2010',10),
+							Booking_Type(102,'12-MAY-2012',18)));
+
+INSERT INTO Cust_Booking2 VALUES(12,'DAVID',Booking_List_Type(
+							Booking_Type(104,'12-MAY-2012',6),
+							Booking_Type(102,'12-JUN-2014',13)));
+
+
+5. CREATING PROCEDURE
+
+
+CREATE OR REPLACE PROCEDURE ADD_BOOKING(p_custid NUMBER,
+						p_bid NUMBER,
+						p_tdate  DATE,
+						p_dur NUMBER)
+IS	
+	CURSOR c_book IS
+		SELECT Cust_id FROM Cust_Booking2;
+	v_type Booking_List_Type;
+	v_flag NUMBER;
+BEGIN
+	v_flag :=0;
+	FOR i IN c_book LOOP
+		IF i.Cust_id = p_custid THEN
+			v_flag := 1;
+			EXIT;
+		END IF;
+	END LOOP;
+	IF ( v_flag = 1)
+		THEN
+			DBMS_OUTPUT.PUT_LINE ('CUSTOMER EXISTS');
+			select Booking_List into v_type  from Cust_Booking2 where Cust_id = p_custid ;
+			IF v_type.COUNT< v_type.LIMIT THEN
+				v_type.EXTEND;
+				v_type(v_type.LAST) := Booking_Type(p_bid,p_tdate,p_dur);
+				UPDATE Cust_Booking2 SET Booking_List =v_type WHERE Cust_id = p_custid;	
+				DBMS_OUTPUT.PUT_LINE('BOOKING IS DONE SUCCESSFULLY');
+			END IF;
+	ELSE
+			DBMS_OUTPUT.PUT_LINE('NO CUSTOMER WITH THIS ID');
+	END IF;
+	
+END ADD_BOOKING;
+
+
+
+
+6. TEST CASES PLSQL BLOCK
+	
+	1.VALID CASE
+		IS
+		BEGIN
+			ADD_BOOKING(10,104,'12-MAY-2012',6);
+		END;
+
+	2.INVALID CASE
+		IS
+		BEGIN
+			ADD_BOOKING(121,145,'11-SEP-2012',7);
+		END;
